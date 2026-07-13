@@ -20,7 +20,7 @@
 
 #define RGB(r, g, b) ((((r) >> 4) << 8) | (((g) >> 4) << 4) | ((b) >> 4))
 
-void test_mmap_static(int fd) {
+void test_mmap_static(int fd, uint32_t crtc_id, uint32_t connector_id) {
     struct drm_mode_create_dumb create = {0};
     struct drm_mode_map_dumb map_req = {0};
     struct drm_mode_fb_cmd add_fb = {0};
@@ -30,8 +30,6 @@ void test_mmap_static(int fd) {
     struct drm_mode_destroy_dumb destroy = {0};
     
     uint32_t *vram;
-    uint32_t connector_id = 36;
-    uint32_t crtc_id = 34;
 
     struct drm_mode_modeinfo mode = {
         .clock = 25175,
@@ -176,8 +174,19 @@ void test_animation(int fd) {
     }
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     srand(time(NULL));
+
+    uint32_t crtc_id = 34;
+    uint32_t connector_id = 36;
+
+    if (argc == 3) {
+        crtc_id = strtoul(argv[1], NULL, 10);
+        connector_id = strtoul(argv[2], NULL, 10);
+    } else {
+        printf("Using default IDs: CRTC=%u, Connector=%u\n", crtc_id, connector_id);
+        printf("Note: If SETCRTC fails, pass correct IDs via: %s <crtc_id> <connector_id>\n", argv[0]);
+    }
 
     printf("Opening DRM device " DEVICE_PATH "...\n");
     int fd = open(DEVICE_PATH, O_RDWR);
@@ -186,7 +195,7 @@ int main() {
         return 1;
     }
 
-    test_mmap_static(fd);
+    test_mmap_static(fd, crtc_id, connector_id);
     test_clear(fd);
     test_interrupt_stress(fd);
     test_animation(fd);
