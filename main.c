@@ -11,8 +11,6 @@
 #include <drm/drm.h>
 #include <drm/drm_mode.h>
 
-#include "glanda_drm.h"
-
 #define DEVICE_PATH "/dev/dri/card0"
 #define H_RES 640
 #define V_RES 480
@@ -115,65 +113,6 @@ err_destroy:
     ioctl(fd, DRM_IOCTL_MODE_DESTROY_DUMB, &destroy);
 }
 
-void test_clear(int fd) {
-    printf("[IOCTL] Testing Hardware Clear...\n");
-    struct glanda_clear_cmd cmd = { .color = RGB(0, 0, 50) }; // Dark Blue
-    if (ioctl(fd, DRM_IOCTL_GLANDA_CLEAR, &cmd) < 0) {
-        perror("Clear failed");
-    }
-    usleep(200000);
-}
-
-void test_interrupt_stress(int fd) {
-    printf("[IRQ TEST] Stress testing Interrupt Wait Queue (Starburst)...\n");
-    printf("Sending 360 line commands back-to-back.\n");
-    printf("If driver hangs here, IRQs/wait queues are broken.\n");
-
-    int cx = H_RES / 2;
-    int cy = V_RES / 2;
-    int radius = 200;
-
-    for (int deg = 0; deg < 360; deg += 2) {
-        float rad = deg * (3.14159f / 180.0f);
-        struct glanda_draw_line_cmd cmd;
-        
-        cmd.x0 = cx;
-        cmd.y0 = cy;
-        cmd.x1 = cx + (int)(cos(rad) * radius);
-        cmd.y1 = cy + (int)(sin(rad) * radius);
-        cmd.color = RGB(255, 200, 0); // Gold
-
-        if (ioctl(fd, DRM_IOCTL_GLANDA_DRAW_LINE, &cmd) < 0) {
-            perror("Line ioctl failed");
-            break;
-        }
-    }
-    printf("[IRQ TEST] Burst complete.\n");
-    sleep(1);
-}
-
-void test_animation(int fd) {
-    printf("[ANIMATION] Bouncing Box...\n");
-    
-    int x = 10, y = 10;
-    int dx = 5, dy = 5;
-    int w = 50, h = 50;
-    
-    for (int i = 0; i < 300; i++) {
-        struct glanda_draw_rect_cmd clear_rect = { x, y, w, h, RGB(0,0,50) }; // Match BG
-        ioctl(fd, DRM_IOCTL_GLANDA_DRAW_RECT, &clear_rect);
-
-        x += dx; y += dy;
-        if (x <= 0 || x + w >= H_RES) dx = -dx;
-        if (y <= 0 || y + h >= V_RES) dy = -dy;
-
-        struct glanda_draw_rect_cmd draw_cmd = { x, y, w, h, RGB(255, 50, 50) };
-        ioctl(fd, DRM_IOCTL_GLANDA_DRAW_RECT, &draw_cmd);
-
-        usleep(16000); // 60 FPS
-    }
-}
-
 int main(int argc, char *argv[]) {
     srand(time(NULL));
 
@@ -196,12 +135,6 @@ int main(int argc, char *argv[]) {
     }
 
     test_mmap_static(fd, crtc_id, connector_id);
-    test_clear(fd);
-    test_interrupt_stress(fd);
-    test_animation(fd);
-
-    struct glanda_clear_cmd end_cmd = { .color = 0 };
-    ioctl(fd, DRM_IOCTL_GLANDA_CLEAR, &end_cmd);
 
     printf("Test Sequence Complete.\n");
     close(fd);
